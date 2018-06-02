@@ -1,0 +1,105 @@
+---
+- hosts: rhel
+  handlers:
+    - name: Restart NetworkManager
+      service:
+        name: NetworkManager
+        state: restarted
+    - name: Reload firewalld
+      service:
+        name: firewalld
+        state: reloaded
+    - name: restart suricata
+      service:
+        name: suricata
+        state: restarted
+        enabled: yes
+  tasks:
+  - name: Full Update -y
+    yum: name=* state=latest
+
+  - name: Install TMUX
+    yum: name=tmux state=latest
+  - name: Copy tmux configuration file
+    copy:
+      force: no
+      src: /home/rb10/Dropbox/Documents/files-to-backup/home/rb10/.tmux.conf
+      dest: /home/rb10/.tmux.conf
+      owner: rb10
+      group: rb10
+      mode: 0644
+      backup: yes
+  - name: Install fail2ban
+    yum: name=fail2ban state=latest
+  - name: Copy fail2ban jail.d/customisation.local file
+    copy:
+      force: no
+      src: /home/rb10/Dropbox/Documents/files-to-backup/etc/fail2ban/jail.d/customisation.local
+      dest: /etc/fail2ban/jail.d/customisation.local
+      owner: root
+      group: root
+      mode: 0644
+      backup: yes
+  - name: Restart fail2ban
+    service:
+      name: fail2ban
+      state: restarted
+      enabled: yes
+
+  - name: Install suricata
+    yum: name=suricata state=latest
+
+  - name: Copy suricata.yaml configuration file
+    copy:
+      force: no
+      src: /home/rb10/Dropbox/Documents/files-to-backup/etc/suricata/suricata.yaml
+      dest: /etc/suricata/suricata.yaml
+      owner: root
+      group: root
+      mode: 0644
+      backup: yes
+
+  - name: Install python2-pip
+    yum: name=python2-pip state=latest
+  - name: Install PyYAML
+    yum: name=PyYAML state=latest
+  - name: pip install --pre suricata-update
+    pip:
+      name: suricata-update
+      extra_args: --pre
+  - name: Set /var/lib/suricata permissions
+    file:
+      dest: /var/lib/suricata/
+      owner: suricata
+      group: root
+      mode: u=rwX,g=rwX,o=rwX
+      state: directory
+      recurse: yes
+  - name: suricata-update update-sources
+    shell: suricata-update update-sources 2>/dev/null
+    args:
+      executable: /bin/bash
+  - name: suricata-update enable-source
+    shell: suricata-update enable-source ptresearch/attackdetection
+    ignore_errors: yes
+    args:
+      executable: /bin/bash
+  - name: suricata-update
+    shell: suricata-update 2>/dev/null
+    args:
+      creates: /var/lib/suricata/rules/my-rules.rules
+      executable: /bin/bash
+  - name: Set iptables (firewalld) rule for suricata IPS
+    command: firewall-cmd --permanent --direct --add-rule ipv4 mangle PREROUTING 0 ! -i lo -m mark ! --mark 0x1/0x1 -j NFQUEUE --queue-bypass
+    notify:
+      - reload firewalld
+  - name: Change suricata.service file
+    shell: echo OPTIONS=" --user suricata --group suricata -q 0 -v" > /etc/sysconfig/suricata
+    args:
+      executable: /bin/bash
+    notify: restart suricata
+#  - name: Restart suricata IPS
+#    service:
+#      name: suricata
+#      state: restarted
+#      enabled: yes
