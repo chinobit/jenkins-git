@@ -1,6 +1,9 @@
-# myansible
-* Initializing my rhel servers using ansible.
-* OS: CentOS7
+# My Jenkins Project
+
+
+# Ansible Configuration
+* Initializing rhel servers using ansible.
+* OS: Fedora 28
 * starting with an update and installing packages:
 
 - tmux
@@ -8,4 +11,3 @@
 - suricata IPS (NFQUEUE)
 - python2-pip
 - suricata-update (rule manager)
-- 
